@@ -1,63 +1,121 @@
-#include <iostream>
-#include <vector>
-#include <stack>
-#include <omp.h>
+// Import necessary libraries
+#include <iostream> // For input and output
+#include <vector>   // For dynamic arrays (adjacency list)
+#include <omp.h>    // For parallelism with OpenMP
+
 using namespace std;
-const int MAX = 100000;
-vector<int> graph[MAX];
-bool visited[MAX];
-void dfs(int node)
+
+// Define a structure for the Graph
+struct Graph
 {
-    stack<int> s;
-    s.push(node);
-    while (!s.empty())
+    int V;                   // Number of vertices
+    vector<vector<int>> adj; // Adjacency list
+
+    // Constructor to initialize graph with V vertices
+    Graph(int V)
     {
-        int curr_node = s.top();
-        s.pop();
-        if (!visited[curr_node])
+        this->V = V;
+        adj.resize(V); // Resize adjacency list to hold V vertices
+    }
+
+    // Function to add an edge between two vertices u and v
+    void addEdge(int u, int v)
+    {
+        adj[u].push_back(v); // Add v to u's list
+        adj[v].push_back(u); // Since it's an undirected graph, add u to v's list
+    }
+
+    // Function to start Depth First Search from a starting node
+    void DFS(int start)
+    {
+        vector<bool> visited(V, false); // Track visited vertices
+
+// Start parallel region
+#pragma omp parallel
         {
-            visited[curr_node] = true;
-            if (visited[curr_node])
+#pragma omp single
             {
-                cout << curr_node << " ";
-            }
-#pragma omp parallel for
-            for (int i = 0; i < graph[curr_node].size(); i++)
-            {
-                int adj_node = graph[curr_node][i];
-                if (!visited[adj_node])
-                {
-                    s.push(adj_node);
-                }
+                DFSUtil(start, visited); // Only one thread starts the DFSUtil
             }
         }
+        cout << endl;
     }
-}
+
+private:
+    // Utility function for DFS
+    void DFSUtil(int u, vector<bool> &visited)
+    {
+#pragma omp critical
+        {
+            if (visited[u])
+                return;        // If already visited, return
+            visited[u] = true; // Mark as visited
+            cout << u << " ";  // Process the node (print it)
+        }
+
+// Explore all neighbors
+#pragma omp parallel for
+        for (int i = 0; i < adj[u].size(); i++)
+        {
+            int v = adj[u][i];
+            if (!visited[v])
+            {
+#pragma omp task
+                DFSUtil(v, visited); // Create a new task for each unvisited neighbor
+            }
+        }
+
+#pragma omp taskwait // Wait for all child tasks to complete
+    }
+};
+
+// Main function
 int main()
 {
-    int n, m, start_node;
-    cout << "Enter No of Node,Edges,and start node:";
-    cin >> n >> m >> start_node;
-    // n: node,m:edges
-    cout << "Enter Pair of edges:";
-    for (int i = 0; i < m; i++)
+    int V; // Number of vertices
+    cout << "Enter number of vertices: ";
+    cin >> V;
+
+    Graph g(V); // Create a graph with V vertices
+
+    int edgeCount; // Number of edges
+    cout << "Enter number of edges: ";
+    cin >> edgeCount;
+
+    cout << "Enter edges (format: u v):\n";
+    for (int i = 0; i < edgeCount; i++)
     {
         int u, v;
         cin >> u >> v;
-        // u and v: Pair of edges
-        graph[u].push_back(v);
-        graph[v].push_back(u);
+        g.addEdge(u, v); // Add each edge to the graph
     }
-#pragma omp parallel for
-    for (int i = 0; i < n; i++)
-    {
-        visited[i] = false;
-    }
-    dfs(start_node);
-    /* for (int i = 0; i < n; i++) {
-    if (visited[i]) {
-    cout << i << " ";
-    }
-    }*/
+
+    cout << "Parallel DFS traversal starting from node 0:\n";
+    g.DFS(0); // Start DFS from node 0
+
     return 0;
 }
+
+/*
+-------------------------
+How to Compile and Run:
+-------------------------
+g++ -fopenmp DFS.cpp -o dfs
+./dfs
+
+-------------------------
+Sample Input:
+-------------------------
+Enter number of vertices: 5
+Enter number of edges: 4
+Enter edges (format: u v):
+0 1
+0 2
+1 3
+1 4
+
+Expected Output:
+Parallel DFS traversal starting from node 0:
+0 1 3 4 2
+(Or other DFS order depending on thread scheduling)
+*/

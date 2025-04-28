@@ -1,50 +1,80 @@
-#include <iostream>
-#include <stdlib.h>
-#include <omp.h>
-using namespace std;
-void bubble(int *, int);
-void swap(int &, int &);
-void bubble(int *a, int n)
-{
-    for (int i = 0; i < n; i++)
-    {
-        int first = i % 2;
+// BubbleSortParallel.cpp
+#include <iostream> // For input-output operations
+#include <vector>   // For using dynamic array (vector)
+#include <omp.h>    // For OpenMP parallelization
+#include <ctime>    // For measuring execution time
 
-#pragma omp parallel for shared(a, first)
-        for (int j = first; j < n - 1; j += 2)
+using namespace std;
+
+// Function to perform parallel bubble sort
+void bubbleSort(vector<int> &arr)
+{
+    int n = arr.size();  // Get size of array
+    bool swapped = true; // Variable to track if any swapping happened
+
+    // Continue loop until no elements are swapped
+    while (swapped)
+    {
+        swapped = false; // Assume no swap happens in this iteration
+
+// Parallelize the 'for' loop using OpenMP
+#pragma omp parallel for
+        for (int i = 0; i < n - 1; i++)
         {
-            if (a[j] > a[j + 1])
+            if (arr[i] > arr[i + 1])
             {
-                swap(a[j], a[j + 1]);
+                swap(arr[i], arr[i + 1]); // Swap if elements are out of order
+                swapped = true;           // Set swapped to true to continue loop
             }
         }
     }
 }
-void swap(int &a, int &b)
-{
 
-    int test;
-    test = a;
-    a = b;
-    b = test;
-}
 int main()
 {
-
-    int *a, n;
-    cout << "\n enter total no of elements=>";
+    int n; // Number of elements
+    cout << "Enter the number of elements: ";
     cin >> n;
-    a = new int[n];
-    cout << "\n enter elements=>";
+
+    vector<int> arr(n); // Declare a vector of size n
+
+    cout << "Enter the elements: ";
     for (int i = 0; i < n; i++)
-    {
-        cin >> a[i];
-    }
-    bubble(a, n);
-    cout << "\n sorted array is=>";
-    for (int i = 0; i < n; i++)
-    {
-        cout << a[i] << endl;
-    }
+        cin >> arr[i]; // Input array elements
+
+    // Start timer before sorting
+    clock_t start = clock();
+
+    bubbleSort(arr); // Call bubble sort
+
+    // End timer after sorting
+    clock_t end = clock();
+
+    cout << "Sorted array using Bubble Sort: ";
+    for (int num : arr)
+        cout << num << " ";
+    cout << endl;
+
+    // Calculate time taken in seconds
+    double duration = double(end - start) / CLOCKS_PER_SEC;
+    cout << "Bubble sort time in seconds: " << duration << endl;
+
     return 0;
 }
+
+/*
+How to compile and run:
+---------------------------------------
+g++ -fopenmp BubbleSort.cpp -o bubble
+./bubble
+
+Sample Input:
+---------------------------------------
+Enter the number of elements: 5
+Enter the elements: 5 2 9 1 5
+
+Expected Output:
+---------------------------------------
+Sorted array using Bubble Sort: 1 2 5 5 9
+Bubble sort time in seconds: (some small number)
+*/

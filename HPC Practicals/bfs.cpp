@@ -1,122 +1,123 @@
-#include <iostream>
-#include <stdlib.h>
-#include <queue>
+// Import necessary libraries
+#include <iostream> // For input and output
+#include <vector>   // For dynamic arrays (adjacency list)
+#include <queue>    // For queue used in BFS
+#include <omp.h>    // For parallelism with OpenMP
+
 using namespace std;
-class node
-{
-public:
-    node *left, *right;
-    int data;
-};
-class Breadthfs
-{
-public:
-    node *insert(node *, int);
-    void bfs(node *);
-};
-node *insert(node *root, int data)
-// inserts a node in tree
-{
-    if (!root)
-    {
 
-        root = new node;
-        root->left = NULL;
-        root->right = NULL;
-        root->data = data;
-        return root;
+// Define a structure for the Graph
+struct Graph
+{
+    int V;                   // Number of vertices
+    vector<vector<int>> adj; // Adjacency list
+
+    // Constructor to initialize graph with V vertices
+    Graph(int V)
+    {
+        this->V = V;
+        adj.resize(V); // Resize adjacency list to hold V vertices
     }
 
-    queue<node *> q;
-    q.push(root);
-
-    while (!q.empty())
+    // Function to add an edge between two vertices u and v
+    void addEdge(int u, int v)
     {
-
-        node *temp = q.front();
-        q.pop();
-
-        if (temp->left == NULL)
-        {
-
-            temp->left = new node;
-            temp->left->left = NULL;
-            temp->left->right = NULL;
-            temp->left->data = data;
-            return root;
-        }
-        else
-        {
-
-            q.push(temp->left);
-        }
-
-        if (temp->right == NULL)
-        {
-
-            temp->right = new node;
-            temp->right->left = NULL;
-            temp->right->right = NULL;
-            temp->right->data = data;
-            return root;
-        }
-        else
-        {
-
-            q.push(temp->right);
-        }
+        adj[u].push_back(v); // Add v to u's list
+        adj[v].push_back(u); // Since it's an undirected graph, add u to v's list
     }
-}
 
-void bfs(node *head)
-{
-
-    queue<node *> q;
-    q.push(head);
-
-    int qSize;
-
-    while (!q.empty())
+    // Function to perform Breadth First Search starting from a given node
+    void BFS(int start)
     {
-        qSize = q.size();
+        vector<bool> visited(V, false); // Track visited vertices
+        queue<int> q;                   // Queue for BFS
+
+        visited[start] = true; // Mark starting node as visited
+        q.push(start);         // Push starting node into queue
+
+        // Standard BFS loop
+        while (!q.empty())
+        {
+            int u = q.front(); // Get the front node
+            q.pop();           // Remove it from queue
+            cout << u << " ";  // Process the node (print it)
+
+            vector<int> neighbors_to_add; // Temporarily store new nodes to add
+
+// Parallelize visiting neighbors
 #pragma omp parallel for
-        // creates parallel threads
-        for (int i = 0; i < qSize; i++)
-        {
-            node *currNode;
-#pragma omp critical
+            for (int i = 0; i < adj[u].size(); i++)
             {
-                currNode = q.front();
-                q.pop();
-                cout << "\t" << currNode->data;
+                int v = adj[u][i]; // Get neighbor
+                if (!visited[v])
+                {    // If not visited
+#pragma omp critical // Prevent race conditions
+                    {
+                        if (!visited[v])
+                        {                                  // Double-check inside critical section
+                            visited[v] = true;             // Mark as visited
+                            neighbors_to_add.push_back(v); // Add to temporary list
+                        }
+                    }
+                }
+            }
 
-            } // prints parent node
-#pragma omp critical
+            // After parallel section, safely push neighbors to queue
+            for (int v : neighbors_to_add)
             {
-                if (currNode->left) // push parent's left node in queue
-                    q.push(currNode->left);
-                if (currNode->right)
-                    q.push(currNode->right);
-            } // push parent's right node in queue
+                q.push(v);
+            }
         }
+        cout << endl;
     }
-}
+};
 
+// Main function
 int main()
 {
+    int V; // Number of vertices
+    cout << "Enter number of vertices: ";
+    cin >> V;
 
-    node *root = NULL;
-    int data;
-    char ans;
+    Graph g(V); // Create a graph with V vertices
 
-    do
+    int edgeCount; // Number of edges
+    cout << "Enter number of edges: ";
+    cin >> edgeCount;
+
+    cout << "Enter edges (format: u v):\n";
+    for (int i = 0; i < edgeCount; i++)
     {
-        cout << "\n enter data=>";
-        cin >> data;
-        root = insert(root, data);
-        cout << "do you want insert one more node?";
-        cin >> ans;
-    } while (ans == 'y' || ans == 'Y');
-    bfs(root);
+        int u, v;
+        cin >> u >> v;
+        g.addEdge(u, v); // Add each edge to the graph
+    }
+
+    cout << "Parallel BFS traversal starting from node 0:\n";
+    g.BFS(0); // Start BFS from node 0
+
     return 0;
 }
+
+/*
+-------------------------
+How to Compile and Run:
+-------------------------
+g++ -fopenmp BFS.cpp -o bfs
+./bfs
+
+-------------------------
+Sample Input:
+-------------------------
+Enter number of vertices: 5
+Enter number of edges: 4
+Enter edges (format: u v):
+0 1
+0 2
+1 3
+1 4
+
+Expected Output:
+Parallel BFS traversal starting from node 0:
+0 1 2 3 4
+*/

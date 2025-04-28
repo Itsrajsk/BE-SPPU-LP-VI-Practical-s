@@ -1,92 +1,120 @@
-#include <iostream>
-#include <stdlib.h>
-#include <omp.h>
+// MergeSortParallel.cpp
+#include <iostream> // For input-output operations
+#include <vector>   // For using dynamic array (vector)
+#include <omp.h>    // For OpenMP parallelization
+#include <ctime>    // For measuring execution time
+
 using namespace std;
 
-void mergesort(int a[], int i, int j);
-void merge(int a[], int i1, int j1, int i2, int j2);
-
-void mergesort(int a[], int i, int j)
+// Function to merge two sorted parts of the array
+void merge(vector<int> &arr, int l, int m, int r)
 {
-    int mid;
-    if (i < j)
+    vector<int> temp;  // Temporary vector to store merged result
+    int left = l;      // Starting index of left subarray
+    int right = m + 1; // Starting index of right subarray
+
+    // Merge the two subarrays into temp
+    while (left <= m && right <= r)
     {
-        mid = (i + j) / 2;
-#pragma omp parallel sections
+        if (arr[left] <= arr[right])
         {
-#pragma omp section
-            {
-                mergesort(a, i, mid); // Sort left half
-            }
-#pragma omp section
-            {
-                mergesort(a, mid + 1, j); // Sort right half
-            }
-        }
-
-        merge(a, i, mid, mid + 1, j); // Merge the two sorted halves
-    }
-}
-
-void merge(int a[], int i1, int j1, int i2, int j2)
-{
-    int temp[1000]; // Temporary array
-    int i, j, k;
-    i = i1; // Starting index of first subarray
-    j = i2; // Starting index of second subarray
-    k = 0;
-
-    while (i <= j1 && j <= j2) // Merge until one subarray ends
-    {
-        if (a[i] < a[j])
-        {
-            temp[k++] = a[i++];
+            temp.push_back(arr[left]);
+            left++;
         }
         else
         {
-            temp[k++] = a[j++];
+            temp.push_back(arr[right]);
+            right++;
         }
     }
 
-    while (i <= j1) // Copy remaining elements of first subarray
+    // Copy remaining elements from left subarray (if any)
+    while (left <= m)
     {
-        temp[k++] = a[i++];
+        temp.push_back(arr[left]);
+        left++;
     }
 
-    while (j <= j2) // Copy remaining elements of second subarray
+    // Copy remaining elements from right subarray (if any)
+    while (right <= r)
     {
-        temp[k++] = a[j++];
+        temp.push_back(arr[right]);
+        right++;
     }
 
-    // Copy merged temp array back to original array
-    for (i = i1, j = 0; i <= j2; i++, j++)
+    // Copy sorted elements back into original array
+    for (int i = l; i <= r; i++)
     {
-        a[i] = temp[j];
+        arr[i] = temp[i - l];
+    }
+}
+
+// Recursive function to perform parallel merge sort
+void mergeSort(vector<int> &arr, int l, int r)
+{
+    if (l < r)
+    {
+        int m = l + (r - l) / 2; // Find mid index
+
+// Split the sorting into two parallel sections
+#pragma omp parallel sections
+        {
+#pragma omp section
+            mergeSort(arr, l, m); // Sort first half
+
+#pragma omp section
+            mergeSort(arr, m + 1, r); // Sort second half
+        }
+
+        merge(arr, l, m, r); // Merge the sorted halves
     }
 }
 
 int main()
 {
-    int *a, n, i;
-    cout << "\nEnter total number of elements => ";
+    int n; // Number of elements
+    cout << "Enter the number of elements: ";
     cin >> n;
-    a = new int[n];
 
-    cout << "\nEnter elements => ";
-    for (i = 0; i < n; i++)
-    {
-        cin >> a[i];
-    }
+    vector<int> arr(n); // Declare a vector of size n
 
-    mergesort(a, 0, n - 1); // 🔥 Call mergesort here to sort the array
+    cout << "Enter the elements: ";
+    for (int i = 0; i < n; i++)
+        cin >> arr[i]; // Input array elements
 
-    cout << "\nSorted array is => ";
-    for (i = 0; i < n; i++)
-    {
-        cout << a[i] << " ";
-    }
+    // Start timer before sorting
+    clock_t start = clock();
+
+    mergeSort(arr, 0, n - 1); // Call merge sort
+
+    // End timer after sorting
+    clock_t end = clock();
+
+    cout << "Sorted array using Merge Sort: ";
+    for (int num : arr)
+        cout << num << " ";
     cout << endl;
 
-    delete[] a; // Free dynamically allocated memory
+    // Calculate time taken in seconds
+    double duration = double(end - start) / CLOCKS_PER_SEC;
+    cout << "Merge sort time in seconds: " << duration << endl;
+
     return 0;
 }
+
+/*
+How to compile and run:
+---------------------------------------
+g++ -fopenmp MergeSort.cpp -o merge
+./merge
+
+Sample Input:
+---------------------------------------
+Enter the number of elements: 5
+Enter the elements: 5 2 9 1 5
+
+Expected Output:
+---------------------------------------
+Sorted array using Merge Sort: 1 2 5 5 9
+Merge sort time in seconds: (some small number)
+*/
